@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Daybreak — alarm clock</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#0d1126">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Daybreak">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --navy-900:#0d1126;
+    --navy-800:#161b3a;
+    --navy-700:#222a52;
+    --sky-100:#dbe6f5;
+    --sky-300:#a9c2e3;
+    --coral-500:#e8784a;
+    --coral-400:#f0976d;
+    --amber-400:#f2b66d;
+    --white:#fdfcfa;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:'Inter',sans-serif;
+    background: linear-gradient(180deg, var(--bg-top,#0d1126) 0%, var(--bg-bottom,#222a52) 100%);
+    transition: background 3s ease;
+    color: var(--sky-100);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    overflow-x:hidden;
+  }
+
+  .sky{
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    pointer-events:none;
+  }
+
+  .sun{
+    position:absolute;
+    width:140px; height:140px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, var(--amber-400), var(--coral-500));
+    left:50%;
+    transform:translateX(-50%);
+    transition: top 3s ease, opacity 3s ease;
+    box-shadow: 0 0 80px 20px rgba(242,182,109,0.25);
+  }
+
+  .stars{
+    position:absolute; inset:0;
+    transition: opacity 3s ease;
+  }
+  .star{
+    position:absolute;
+    width:2px; height:2px;
+    background: var(--sky-100);
+    border-radius:50%;
+    opacity:.6;
+  }
+
+  header{
+    width:100%;
+    max-width:640px;
+    padding: 48px 24px 16px;
+    text-align:center;
+  }
+
+  .eyebrow{
+    font-size:13px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color: var(--coral-400);
+    margin:0 0 8px;
+    font-weight:600;
+  }
+
+  h1{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:clamp(48px, 12vw, 88px);
+    margin:0;
+    letter-spacing:-0.02em;
+    color: var(--white);
+    line-height:1;
+  }
+
+  .date{
+    margin-top:10px;
+    font-size:15px;
+    color: var(--sky-300);
+  }
+
+  main{
+    width:100%;
+    max-width:640px;
+    padding: 24px;
+    flex:1;
+  }
+
+  .panel{
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius:16px;
+    padding:24px;
+    margin-bottom:20px;
+    backdrop-filter: blur(6px);
+  }
+
+  .panel h2{
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    color: var(--sky-300);
+    margin:0 0 16px;
+    font-weight:600;
+  }
+
+  .add-alarm{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .add-alarm input[type="time"]{
+    font-family:'JetBrains Mono', monospace;
+    font-size:20px;
+    background: var(--navy-800);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:10px;
+    color: var(--white);
+    padding:10px 14px;
+    flex:1;
+    min-width:140px;
+  }
+
+  .add-alarm input[type="time"]::-webkit-calendar-picker-indicator{
+    filter: invert(1);
+  }
+
+  body.light{
+    color: var(--navy-800);
+  }
+  body.light .panel{
+    background: rgba(13,17,38,0.04);
+    border-color: rgba(13,17,38,0.08);
+  }
+  body.light h1, body.light .alarm-row .time{
+    color: var(--navy-900);
+  }
+  body.light .date, body.light .panel h2{
+    color: var(--navy-700);
+  }
+  body.light .add-alarm input[type="time"], body.light select{
+    background: #fff;
+    color: var(--navy-900);
+    border-color: rgba(13,17,38,0.15);
+  }
+  body.light .add-alarm input[type="time"]::-webkit-calendar-picker-indicator{
+    filter: none;
+  }
+  body.light .alarm-row{
+    background: rgba(13,17,38,0.03);
+    border-color: rgba(13,17,38,0.08);
+  }
+  body.light .alarm-row .meta{
+    color: var(--navy-700);
+  }
+  body.light .toggle{
+    background: rgba(13,17,38,0.15);
+  }
+  body.light .delete-btn{
+    color: var(--navy-700);
+  }
+  body.light footer{
+    color: var(--navy-700);
+  }
+
+  .theme-toggle{
+    position:fixed;
+    top:20px;
+    right:20px;
+    width:44px; height:44px;
+    border-radius:50%;
+    background: rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.15);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+    z-index:10;
+    color: var(--sky-100);
+    transition: background .2s ease;
+    cursor:pointer;
+  }
+  body.light .theme-toggle{
+    background: rgba(13,17,38,0.06);
+    border-color: rgba(13,17,38,0.12);
+    color: var(--navy-800);
+  }
+  .theme-toggle:hover{ background: rgba(255,255,255,0.16); }
+
+  select{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    background: var(--navy-800);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:10px;
+    color: var(--sky-100);
+    padding:10px 12px;
+  }
+
+  button{
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+  }
+
+  .btn-primary{
+    background: var(--coral-500);
+    color: var(--navy-900);
+    border:none;
+    border-radius:10px;
+    padding:10px 20px;
+    font-weight:600;
+    font-size:14px;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .btn-primary:hover{ background: var(--coral-400); }
+  .btn-primary:active{ transform: scale(0.97); }
+
+  .alarm-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  .alarm-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background: rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+
+  .alarm-row .time{
+    font-family:'JetBrains Mono', monospace;
+    font-size:24px;
+    font-weight:500;
+    color: var(--white);
+    min-width:110px;
+  }
+
+  .alarm-row .meta{
+    font-size:12px;
+    color: var(--sky-300);
+    margin-top:2px;
+  }
+
+  .alarm-actions{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .toggle{
+    position:relative;
+    width:42px; height:24px;
+    background: rgba(255,255,255,0.15);
+    border-radius:999px;
+    cursor:pointer;
+    transition: background .2s ease;
+    flex-shrink:0;
+  }
+  .toggle.on{ background: var(--coral-500); }
+  .toggle .knob{
+    position:absolute;
+    top:3px; left:3px;
+    width:18px; height:18px;
+    background: var(--white);
+    border-radius:50%;
+    transition: left .2s ease;
+  }
+  .toggle.on .knob{ left:21px; }
+
+  .delete-btn{
+    background:none;
+    border:none;
+    color: var(--sky-300);
+    font-size:18px;
+    padding:4px 8px;
+    border-radius:8px;
+    transition: color .15s ease, background .15s ease;
+  }
+  .delete-btn:hover{ color: var(--coral-400); background: rgba(255,255,255,0.06); }
+
+  .empty{
+    text-align:center;
+    color: var(--sky-300);
+    font-size:14px;
+    padding:20px 0;
+  }
+
+  .overlay{
+    position:fixed;
+    inset:0;
+    background: rgba(13,17,38,0.92);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    flex-direction:column;
+    gap:24px;
+  }
+  .overlay.show{ display:flex; }
+  .overlay .ringing-time{
+    font-family:'JetBrains Mono', monospace;
+    font-size:96px;
+    font-weight:700;
+    color: var(--white);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%, 100%{ opacity:1; }
+    50%{ opacity:.5; }
+  }
+  .overlay .label{
+    color: var(--coral-400);
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-weight:600;
+  }
+  .overlay-actions{
+    display:flex;
+    gap:14px;
+  }
+  .btn-snooze{
+    background: rgba(255,255,255,0.1);
+    color: var(--white);
+    border:1px solid rgba(255,255,255,0.2);
+    border-radius:10px;
+    padding:14px 28px;
+    font-weight:600;
+    font-size:15px;
+  }
+  .btn-stop{
+    background: var(--coral-500);
+    color: var(--navy-900);
+    border:none;
+    border-radius:10px;
+    padding:14px 28px;
+    font-weight:600;
+    font-size:15px;
+  }
+
+  footer{
+    color: var(--sky-300);
+    font-size:12px;
+    padding:24px;
+    text-align:center;
+    opacity:.6;
+  }
+
+  @media (max-width: 420px){
+    .alarm-row .time{ font-size:20px; min-width:90px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sky">
+  <div class="stars" id="stars"></div>
+  <div class="sun" id="sun"></div>
+</div>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle light and dark theme">
+  <span id="themeIcon">&#9789;</span>
+</button>
+
+<header>
+  <p class="eyebrow" id="greeting">Good evening</p>
+  <h1 id="clock">00:00:00</h1>
+  <p class="date" id="dateLabel">—</p>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>New alarm</h2>
+    <div class="add-alarm">
+      <input type="time" id="timeInput">
+      <select id="repeatInput">
+        <option value="once">Once</option>
+        <option value="daily">Every day</option>
+        <option value="weekdays">Weekdays</option>
+      </select>
+      <select id="ringtoneInput">
+        <option value="beep">Beep</option>
+        <option value="chime">Chime</option>
+        <option value="bell">Bell</option>
+        <option value="siren">Siren</option>
+      </select>
+      <button class="btn-primary" id="addBtn">Add alarm</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Your alarms</h2>
+    <div class="alarm-list" id="alarmList"></div>
+    <p class="empty" id="emptyState">No alarms set. Add one above to wake up on time.</p>
+  </div>
+</main>
+
+<footer>Keep this tab open for alarms to ring.</footer>
+
+<div class="overlay" id="overlay">
+  <p class="label">Alarm</p>
+  <p class="ringing-time" id="ringingTime">00:00</p>
+  <div class="overlay-actions">
+    <button class="btn-snooze" id="snoozeBtn">Snooze 5 min</button>
+    <button class="btn-stop" id="stopBtn">Stop</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var clockEl = document.getElementById('clock');
+  var dateEl = document.getElementById('dateLabel');
+  var greetingEl = document.getElementById('greeting');
+  var sunEl = document.getElementById('sun');
+  var starsEl = document.getElementById('stars');
+  var listEl = document.getElementById('alarmList');
+  var emptyEl = document.getElementById('emptyState');
+  var timeInput = document.getElementById('timeInput');
+  var repeatInput = document.getElementById('repeatInput');
+  var ringtoneInput = document.getElementById('ringtoneInput');
+  var addBtn = document.getElementById('addBtn');
+  var overlay = document.getElementById('overlay');
+  var ringingTime = document.getElementById('ringingTime');
+  var snoozeBtn = document.getElementById('snoozeBtn');
+  var stopBtn = document.getElementById('stopBtn');
+
+  var alarms = [];
+  var ringingAlarmId = null;
+  var audioCtx = null;
+  var beepInterval = null;
+
+  function pad(n){ return n < 10 ? '0' + n : '' + n; }
+
+  function fmt12(h, m){
+    var period = h >= 12 ? 'PM' : 'AM';
+    var hh = h % 12; if(hh === 0) hh = 12;
+    return hh + ':' + pad(m) + ' ' + period;
+  }
+
+  function renderStars(){
+    var html = '';
+    for(var i=0;i<60;i++){
+      var top = Math.random()*70;
+      var left = Math.random()*100;
+      html += '<div class="star" style="top:'+top+'%; left:'+left+'%;"></div>';
+    }
+    starsEl.innerHTML = html;
+  }
+  renderStars();
+
+  function updateSky(now){
+    var h = now.getHours() + now.getMinutes()/60;
+    var root = document.documentElement;
+    var top, bottom, sunTop, sunOpacity, starsOpacity, greeting;
+
+    if(h >= 5 && h < 7){
+      top = '#3a2e4a'; bottom = '#8a5a4a'; sunTop = '70%'; sunOpacity = 0.9; starsOpacity = 0.2; greeting = 'Good morning';
+    } else if(h >= 7 && h < 17){
+      top = '#3f7cb0'; bottom = '#8fc1de'; sunTop = '5%'; sunOpacity = 1; starsOpacity = 0; greeting = 'Good day';
+    } else if(h >= 17 && h < 19.5){
+      top = '#2a2350'; bottom = '#d9784a'; sunTop = '55%'; sunOpacity = 1; starsOpacity = 0.15; greeting = 'Good evening';
+    } else {
+      top = '#0d1126'; bottom = '#222a52'; sunTop = '110%'; sunOpacity = 0; starsOpacity = 0.8; greeting = 'Good night';
+    }
+
+    root.style.setProperty('--bg-top', top);
+    root.style.setProperty('--bg-bottom', bottom);
+    sunEl.style.top = sunTop;
+    sunEl.style.opacity = sunOpacity;
+    starsEl.style.opacity = starsOpacity;
+    greetingEl.textContent = greeting;
+  }
+
+  function tick(){
+    var now = new Date();
+    clockEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    dateEl.textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+    updateSky(now);
+    checkAlarms(now);
+  }
+
+  function checkAlarms(now){
+    if(ringingAlarmId !== null) return;
+    var h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    if(s !== 0) return;
+    var dayIdx = now.getDay();
+    alarms.forEach(function(a){
+      if(!a.enabled || a.firedThisMinute) return;
+      if(a.hour === h && a.minute === m){
+        if(a.repeat === 'weekdays' && (dayIdx === 0 || dayIdx === 6)) return;
+        ring(a);
+      }
+    });
+  }
+
+  function ring(alarm){
+    ringingAlarmId = alarm.id;
+    ringingTime.textContent = fmt12(alarm.hour, alarm.minute);
+    overlay.classList.add('show');
+    startBeep(alarm.ringtone);
+  }
+
+  function startBeep(ringtone){
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      playRingtone(ringtone || 'beep');
+      var loopMs = ringtone === 'siren' ? 1400 : (ringtone === 'bell' ? 900 : (ringtone === 'chime' ? 1100 : 500));
+      beepInterval = setInterval(function(){ playRingtone(ringtone || 'beep'); }, loopMs);
+    } catch(e){}
+  }
+
+  function playRingtone(type){
+    var now = audioCtx.currentTime;
+    if(type === 'chime'){
+      [880, 1108, 1318].forEach(function(freq, i){
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + i*0.18);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + i*0.18 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.18 + 0.5);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(now + i*0.18);
+        osc.stop(now + i*0.18 + 0.55);
+      });
+    } else if(type === 'bell'){
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(660, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.6);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.75);
+    } else if(type === 'siren'){
+      var osc2 = audioCtx.createOscillator();
+      var gain2 = audioCtx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(500, now);
+      osc2.frequency.linearRampToValueAtTime(1000, now + 0.5);
+      osc2.frequency.linearRampToValueAtTime(500, now + 1.0);
+      gain2.gain.value = 0.15;
+      osc2.connect(gain2).connect(audioCtx.destination);
+      osc2.start(now);
+      osc2.stop(now + 1.05);
+    } else {
+      var oscB = audioCtx.createOscillator();
+      var gainB = audioCtx.createGain();
+      oscB.type = 'square';
+      oscB.frequency.value = 880;
+      gainB.gain.value = 0.15;
+      oscB.connect(gainB).connect(audioCtx.destination);
+      oscB.start(now);
+      oscB.stop(now + 0.22);
+    }
+  }
+
+  function stopBeep(){
+    if(beepInterval){ clearInterval(beepInterval); beepInterval = null; }
+  }
+
+  function dismissAlarm(snooze){
+    stopBeep();
+    overlay.classList.remove('show');
+    var alarm = alarms.find(function(a){ return a.id === ringingAlarmId; });
+    if(alarm){
+      if(snooze){
+        var d = new Date();
+        d.setMinutes(d.getMinutes() + 5);
+        alarm.hour = d.getHours();
+        alarm.minute = d.getMinutes();
+      } else if(alarm.repeat === 'once'){
+        alarm.enabled = false;
+      }
+    }
+    ringingAlarmId = null;
+    renderAlarms();
+  }
+
+  snoozeBtn.addEventListener('click', function(){ dismissAlarm(true); });
+  stopBtn.addEventListener('click', function(){ dismissAlarm(false); });
+
+  function addAlarm(){
+    var val = timeInput.value;
+    if(!val) return;
+    var parts = val.split(':');
+    var alarm = {
+      id: Date.now(),
+      hour: parseInt(parts[0], 10),
+      minute: parseInt(parts[1], 10),
+      repeat: repeatInput.value,
+      ringtone: ringtoneInput.value,
+      enabled: true
+    };
+    alarms.push(alarm);
+    alarms.sort(function(a,b){ return (a.hour*60+a.minute) - (b.hour*60+b.minute); });
+    renderAlarms();
+    timeInput.value = '';
+  }
+
+  addBtn.addEventListener('click', addAlarm);
+
+  function repeatLabel(r){
+    if(r === 'daily') return 'Every day';
+    if(r === 'weekdays') return 'Weekdays';
+    return 'Once';
+  }
+
+  function ringtoneLabel(r){
+    if(r === 'chime') return 'Chime';
+    if(r === 'bell') return 'Bell';
+    if(r === 'siren') return 'Siren';
+    return 'Beep';
+  }
+
+  function renderAlarms(){
+    listEl.innerHTML = '';
+    emptyEl.style.display = alarms.length === 0 ? 'block' : 'none';
+    alarms.forEach(function(a){
+      var row = document.createElement('div');
+      row.className = 'alarm-row';
+
+      var left = document.createElement('div');
+      var timeDiv = document.createElement('div');
+      timeDiv.className = 'time';
+      timeDiv.textContent = fmt12(a.hour, a.minute);
+      var metaDiv = document.createElement('div');
+      metaDiv.className = 'meta';
+      metaDiv.textContent = repeatLabel(a.repeat) + ' · ' + ringtoneLabel(a.ringtone);
+      left.appendChild(timeDiv);
+      left.appendChild(metaDiv);
+
+      var actions = document.createElement('div');
+      actions.className = 'alarm-actions';
+
+      var toggle = document.createElement('div');
+      toggle.className = 'toggle' + (a.enabled ? ' on' : '');
+      var knob = document.createElement('div');
+      knob.className = 'knob';
+      toggle.appendChild(knob);
+      toggle.addEventListener('click', function(){
+        a.enabled = !a.enabled;
+        renderAlarms();
+      });
+
+      var del = document.createElement('button');
+      del.className = 'delete-btn';
+      del.innerHTML = '&#10005;';
+      del.setAttribute('aria-label', 'Delete alarm');
+      del.addEventListener('click', function(){
+        alarms = alarms.filter(function(x){ return x.id !== a.id; });
+        renderAlarms();
+      });
+
+      actions.appendChild(toggle);
+      actions.appendChild(del);
+
+      row.appendChild(left);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+  }
+
+  ringtoneInput.addEventListener('change', function(){
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      playRingtone(ringtoneInput.value);
+    } catch(e){}
+  });
+
+  var themeToggle = document.getElementById('themeToggle');
+  var themeIcon = document.getElementById('themeIcon');
+  function applyTheme(mode){
+    if(mode === 'light'){
+      document.body.classList.add('light');
+      themeIcon.innerHTML = '&#9788;';
+    } else {
+      document.body.classList.remove('light');
+      themeIcon.innerHTML = '&#9789;';
+    }
+  }
+  var savedTheme = 'dark';
+  applyTheme(savedTheme);
+  themeToggle.addEventListener('click', function(){
+    savedTheme = document.body.classList.contains('light') ? 'dark' : 'light';
+    applyTheme(savedTheme);
+  });
+
+  tick();
+  setInterval(tick, 1000);
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
